@@ -1,69 +1,24 @@
-version: "3.8"
-
-networks:
-  traefik-proxy:
-    external: true
-  loki:
-  internal:
-
-volumes:
-  grafana-data:
-  loki-data:
+version: '3.8'
 
 services:
-  loki:
-    image: grafana/loki:2.0.0
-    container_name: grafana-loki
-    command: -config.file=/mnt/config/loki-config.yml
-    restart: unless-stopped
-    volumes:
-      - ./loki-config.yml:/mnt/config/loki-config.yml
-      - loki-data:/loki
+  hapifhir:
+    image: hapiproject/hapi:latest
+    container_name: hapifhir
     ports:
-      - 127.0.0.1:3100:3100
+      - "8080:8080"
     networks:
-      - loki
-
-  grafana:
-    image: grafana/grafana:7.2.2
-    container_name: grafana
-    restart: unless-stopped
-    volumes:
-      - grafana-data:/var/lib/grafana
-    expose:
-      - 3000
-    networks:
-      - loki
-      - traefik-proxy
-    labels:
-      - traefik.enable=true
-      - traefik.http.services.loki.loadbalancer.server.port=3000
-      - traefik.http.routers.loki.rule=Host(`loki.example.com`)
-      - traefik.http.routers.loki.tls.certresolver=le
-      - traefik.http.routers.loki.entrypoints=websecure
-      - traefik.docker.network=traefik-proxy
+      - app_network
 
   nginx:
-    image: nginx
+    build: .
     container_name: nginx
-    restart: unless-stopped
-    logging:
-      driver: loki
-      options:
-        loki-url: "http://loki:3100/loki/api/v1/push"
     ports:
-      - 8888:8888
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - "80:80"
+    depends_on:
+      - hapifhir
     networks:
-      - loki
-      - internal
+      - app_network
 
-  fhir:
-    image: hapiproject/hapi:v6.10.0
-    container_name: fhir-server
-    restart: unless-stopped
-    ports:
-      - 8080:8080
-    networks:
-      - internal
+networks:
+  app_network:
+    driver: bridge
